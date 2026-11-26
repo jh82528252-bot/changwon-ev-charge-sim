@@ -282,4 +282,809 @@
             <input id="batteryKwh" type="number" min="10" max="250" step="1" value="60" />
           </div>
           <div class="field">
-            <label for="maxVehicleKw">차량 최대 수용 출력 (kW)</
+            <label for="maxVehicleKw">차량 최대 수용 출력 (kW)</label>
+            <input id="maxVehicleKw" type="number" min="3" max="350" step="1" value="100" />
+          </div>
+        </div>
+
+        <div class="row-2">
+          <div class="field">
+            <label for="dwellMin">예상 체류 시간 (분)</label>
+            <input id="dwellMin" type="number" min="0" max="720" value="45" />
+          </div>
+          <div class="field">
+            <label for="hourSlot">이용 예정 시간대 (시)</label>
+            <select id="hourSlot">
+              <option value="1">01시 (새벽 수요 집중 00~03시)</option>
+              <option value="7">07시 (새벽·아침 전환 03~10시)</option>
+              <option value="12" selected>12시 (낮 시간대 10~15시)</option>
+              <option value="16">16시 (오후 수요 증가 15~18시)</option>
+              <option value="20">20시 (저녁 수요 집중 18~23시)</option>
+              <option value="23">23시 (심야 전환 23~24시)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="season">계절 시나리오</label>
+          <select id="season">
+            <option value="spring_fall" selected>봄·가을 (기본 시나리오)</option>
+            <option value="summer">여름 (냉방·배터리 온도 관리 가정)</option>
+            <option value="winter">겨울 (저온·난방 수요 +15%p 상향 가정)</option>
+          </select>
+        </div>
+
+        <button class="btn btn-primary" id="runBtn">최적 충전소 추천 계산</button>
+        <button class="btn btn-outline" id="simDistBtn">피크 시간대 수요 분산 시뮬레이션(90% → 65% 이하)</button>
+      </section>
+
+      <section class="panel">
+        <h2>2. 한국환경공단 API 연동 (실험용)</h2>
+        <div class="field">
+          <label for="apiKey">공공데이터포털 ServiceKey (브라우저 테스트용)</label>
+          <input id="apiKey" type="password" placeholder="미입력 시 내장 시뮬레이션/샘플 데이터 사용" />
+        </div>
+        <button class="btn btn-secondary" id="loadApiBtn">API 상태/정보 조회 시도</button>
+        <button class="btn btn-secondary" id="resetSampleBtn">내장 샘플 데이터로 복원</button>
+        <p id="apiStatus" class="note">
+          <span class="badge badge-sim">시뮬레이션/샘플</span> 현재 내장 샘플 데이터(팔용동·중앙동·석동)를 사용 중입니다.
+        </p>
+        <p class="note">
+          ※ API 연동 시에도 우회 시간·대기 시간·가동률은 시뮬레이션 가정값이 병행되며, 운영 환경에서는 API 키를 서버 측에 보관하는 구성을 권장합니다.
+        </p>
+      </section>
+    </div>
+
+    <main>
+      <section class="panel">
+        <h2>3. 추천 결과 및 총 소요 시간 분석</h2>
+        <div id="recommendationArea"></div>
+        <div id="distributionArea"></div>
+      </section>
+
+      <section class="panel">
+        <h2>4. 시간대별 충전 패턴 및 거점 수요 비교</h2>
+        <div id="timePatternArea"></div>
+        <p class="note">
+          ※ 한국전력거래소 「전기자동차 충전패턴 분석 및 미래전망 연구」(2025년 12월) 참고: 완속은 00~03시·18~23시 높고 10~15시 낮은 경향, 급속은 오전 9시 이후 증가해 정오~오후 4시 집중 경향이 관찰되었습니다. 창원시 거점 가동률은 알고리즘 검증용 시뮬레이션 가정값입니다.
+        </p>
+      </section>
+
+      <section class="panel">
+        <h2>5. 충전소 필터·정렬 및 상세 현황</h2>
+        <div class="toolbar">
+          <select id="filterRegion">
+            <option value="ALL">전체 거점</option>
+            <option value="팔용동">팔용동</option>
+            <option value="중앙동">중앙동</option>
+            <option value="석동">석동</option>
+          </select>
+          <select id="filterType">
+            <option value="ALL">전체 충전기 종류</option>
+            <option value="급속">급속 (50kW 이상)</option>
+            <option value="완속">완속 (7kW)</option>
+          </select>
+          <select id="filterAvail">
+            <option value="ALL">전체 상태</option>
+            <option value="AVAILABLE_ONLY">정상 이용 가능만</option>
+          </select>
+          <select id="sortBy">
+            <option value="totalTime">정렬: 총 소요 시간 짧은 순</option>
+            <option value="occRate">정렬: 예상 가동률 낮은 순</option>
+            <option value="waitTime">정렬: 예상 대기 시간 짧은 순</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>충전소명(거점)</th>
+                <th>종류/출력</th>
+                <th>운영 상태</th>
+                <th>예상 가동률</th>
+                <th>추가 이동</th>
+                <th>예상 대기</th>
+                <th>예상 충전</th>
+                <th>총 소요</th>
+                <th>체류 내 목표</th>
+              </tr>
+            </thead>
+            <tbody id="stationTableBody"></tbody>
+          </table>
+        </div>
+        <p class="note">
+          ※ 초기 기준 안내: 예상 가동률 60% 미만, 추가 이동 5분 이내, 체류 시간 내(예상 대기 + 예상 충전 ≤ 체류 시간) 목표 SOC 달성을 우선 고려하며, 조건 미충족 시 총 소요 시간 기준 대체 충전소를 안내합니다.
+        </p>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const INITIAL_STATIONS = [
+      {
+        id: "PY-01",
+        name: "팔용동 공영주차장 급속충전소",
+        region: "팔용동",
+        type: "급속",
+        ratedKw: 100,
+        operationalChargers: 4,
+        chargingNow: 2,
+        queueCountSim: 0,
+        avgChargeSessionMin: 35,
+        extraDetourMin: 3,
+        status: "AVAILABLE",
+        dataSourceType: "시뮬레이션/샘플"
+      },
+      {
+        id: "PY-02",
+        name: "팔용동 상업·생활 완속충전소",
+        region: "팔용동",
+        type: "완속",
+        ratedKw: 7,
+        operationalChargers: 6,
+        chargingNow: 3,
+        queueCountSim: 0,
+        avgChargeSessionMin: 180,
+        extraDetourMin: 2,
+        status: "AVAILABLE",
+        dataSourceType: "시뮬레이션/샘플"
+      },
+      {
+        id: "JA-01",
+        name: "중앙동 업무·상권 급속충전소",
+        region: "중앙동",
+        type: "급속",
+        ratedKw: 100,
+        operationalChargers: 4,
+        chargingNow: 3,
+        queueCountSim: 1,
+        avgChargeSessionMin: 35,
+        extraDetourMin: 4,
+        status: "AVAILABLE",
+        dataSourceType: "시뮬레이션/샘플"
+      },
+      {
+        id: "JA-02",
+        name: "중앙동 오피스 완속충전소",
+        region: "중앙동",
+        type: "완속",
+        ratedKw: 7,
+        operationalChargers: 5,
+        chargingNow: 4,
+        queueCountSim: 0,
+        avgChargeSessionMin: 180,
+        extraDetourMin: 6,
+        status: "AVAILABLE",
+        dataSourceType: "시뮬레이션/샘플"
+      },
+      {
+        id: "SD-01",
+        name: "석동 생활거점 급속충전소",
+        region: "석동",
+        type: "급속",
+        ratedKw: 50,
+        operationalChargers: 3,
+        chargingNow: 1,
+        queueCountSim: 0,
+        avgChargeSessionMin: 40,
+        extraDetourMin: 4,
+        status: "AVAILABLE",
+        dataSourceType: "시뮬레이션/샘플"
+      },
+      {
+        id: "SD-02",
+        name: "석동 주거단지 완속충전소",
+        region: "석동",
+        type: "완속",
+        ratedKw: 7,
+        operationalChargers: 6,
+        chargingNow: 5,
+        queueCountSim: 1,
+        avgChargeSessionMin: 180,
+        extraDetourMin: 2,
+        status: "MAINTENANCE",
+        dataSourceType: "시뮬레이션/샘플"
+      }
+    ];
+
+    const TIME_BANDS = [
+      { key: "dawn", label: "새벽 수요 집중 (00~03시)", desc: "완속 충전기 이용 집중 구간", match: h => h >= 0 && h < 3 },
+      { key: "morn", label: "새벽·아침 전환 (03~10시)", desc: "새벽 감소 후 급속 이용 증가 전환", match: h => h >= 3 && h < 10 },
+      { key: "mid",  label: "낮 시간대 수요 (10~15시)", desc: "완속 상대적 저수요, 급속 이용 증가", match: h => h >= 10 && h < 15 },
+      { key: "aft",  label: "오후 수요 증가 (15~18시)", desc: "급속 오후 집중 및 저녁 수요 증가", match: h => h >= 15 && h < 18 },
+      { key: "eve",  label: "저녁 수요 집중 (18~23시)", desc: "완속 저녁·야간 충전 집중 구간", match: h => h >= 18 && h < 23 },
+      { key: "late", label: "심야 전환 (23~24시)", desc: "저녁 집중에서 심야 시간대로 전환", match: h => h >= 23 || h < 0 }
+    ];
+
+    const ALLOWED_AVAILABLE_STAT_CODES = new Set(["2", "3"]);
+
+    function mapChargerStatus(statCode) {
+      const code = String(statCode ?? "").trim();
+      if (ALLOWED_AVAILABLE_STAT_CODES.has(code)) return "AVAILABLE";
+      if (code === "4" || code === "5") return "MAINTENANCE";
+      return "COMM_ERROR";
+    }
+
+    function getBaseOccupancyByHour(region, hour) {
+      const table = {
+        "석동":   { dawn: 85, mid: 35, eve: 80, trans: 60 },
+        "팔용동": { dawn: 80, mid: 40, eve: 85, trans: 62 },
+        "중앙동": { dawn: 80, mid: 35, eve: 90, trans: 65 }
+      };
+      const r = table[region] || table["팔용동"];
+      if (hour >= 0 && hour < 3) return r.dawn;
+      if (hour >= 10 && hour < 15) return r.mid;
+      if (hour >= 18 && hour < 23) return r.eve;
+      return r.trans;
+    }
+
+    function getSeasonDelta(season) {
+      if (season === "winter") return 15;
+      if (season === "summer") return 5;
+      return 0;
+    }
+
+    function extractApiItems(apiPayload) {
+      if (!apiPayload || typeof apiPayload !== "object") return [];
+      const rawItem = apiPayload?.response?.body?.items?.item ?? apiPayload?.items?.item ?? [];
+      if (Array.isArray(rawItem)) return rawItem;
+      if (rawItem && typeof rawItem === "object") return [rawItem];
+      return [];
+    }
+
+    function mapApiItemsToStations(itemsOrPayload) {
+      const items = Array.isArray(itemsOrPayload) ? itemsOrPayload : extractApiItems(itemsOrPayload);
+      const filtered = items.filter(it =>
+        ["팔용동", "중앙동", "석동"].some(dong => String(it?.addr || "").includes(dong))
+      );
+      return filtered.slice(0, 12).map((it, idx) => {
+        const addr = String(it.addr || "");
+        const region = addr.includes("팔용동") ? "팔용동" : addr.includes("중앙동") ? "중앙동" : "석동";
+        const kw = Number(it.output || 7);
+        const safeKw = Number.isFinite(kw) && kw > 0 ? kw : 7;
+        const isFast = safeKw >= 50;
+        const statCode = String(it.stat ?? "").trim();
+        const status = mapChargerStatus(statCode);
+
+        return {
+          id: String(it.statId || "API") + "-" + idx,
+          name: String(it.statNm || `충전소 ${idx + 1}`),
+          region,
+          type: isFast ? "급속" : "완속",
+          ratedKw: safeKw,
+          operationalChargers: 2,
+          chargingNow: statCode === "3" ? 1 : 0,
+          queueCountSim: 0,
+          avgChargeSessionMin: isFast ? 35 : 180,
+          extraDetourMin: 3 + (idx % 4),
+          status,
+          dataSourceType: `API+가정(갱신:${String(it.statUpdDt || "-")})`
+        };
+      });
+    }
+
+    function validateUserInput(input) {
+      const errors = [];
+      const { currentSoc, targetSoc, batteryKwh, maxVehicleKw, dwellMin, hourSlot } = input;
+
+      if (!Number.isFinite(currentSoc) || currentSoc < 0 || currentSoc > 100) {
+        errors.push("현재 SOC는 0~100 사이의 숫자여야 합니다.");
+      }
+      if (!Number.isFinite(targetSoc) || targetSoc < 1 || targetSoc > 100) {
+        errors.push("목표 SOC는 1~100 사이의 숫자여야 합니다.");
+      }
+      if (!Number.isFinite(batteryKwh) || batteryKwh <= 0 || batteryKwh > 300) {
+        errors.push("배터리 용량은 0보다 크고 300kWh 이하여야 합니다.");
+      }
+      if (!Number.isFinite(maxVehicleKw) || maxVehicleKw <= 0 || maxVehicleKw > 500) {
+        errors.push("차량 최대 수용 출력은 0보다 크고 500kW 이하여야 합니다.");
+      }
+      if (!Number.isFinite(dwellMin) || dwellMin < 0 || dwellMin > 1440) {
+        errors.push("예상 체류 시간은 0~1440분 사이여야 합니다.");
+      }
+      if (!Number.isFinite(hourSlot) || hourSlot < 0 || hourSlot > 23) {
+        errors.push("이용 예정 시간대는 0~23시 사이여야 합니다.");
+      }
+
+      return {
+        valid: errors.length === 0,
+        alreadyCharged: errors.length === 0 && currentSoc >= targetSoc,
+        errors
+      };
+    }
+
+    function calcNeededEnergyKwh(currentSoc, targetSoc, batteryKwh) {
+      if (targetSoc <= currentSoc) return 0;
+      return +(batteryKwh * ((targetSoc - currentSoc) / 100)).toFixed(2);
+    }
+
+    function getSocFactor(socMid) {
+      if (socMid < 50) return 0.95;
+      if (socMid < 80) return 0.75;
+      return 0.40;
+    }
+
+    function calcChargingMinutes(currentSoc, targetSoc, batteryKwh, ratedKw, maxVehicleKw) {
+      if (currentSoc >= targetSoc) return 0;
+      const baseKw = Math.min(ratedKw, maxVehicleKw);
+      const bands = [
+        [0, 50],
+        [50, 80],
+        [80, 100]
+      ];
+      let totalMin = 0;
+
+      for (const [bStart, bEnd] of bands) {
+        const segStart = Math.max(currentSoc, bStart);
+        const segEnd = Math.min(targetSoc, bEnd);
+        if (segEnd > segStart) {
+          const energyKwh = batteryKwh * ((segEnd - segStart) / 100);
+          const socMid = (segStart + segEnd) / 2;
+          const actualKw = Math.max(1.5, baseKw * getSocFactor(socMid));
+          totalMin += (energyKwh / actualKw) * 60;
+        }
+      }
+      return Math.round(totalMin);
+    }
+
+    function calcWaitMinutes(station, occRate) {
+      if (station.status !== "AVAILABLE") return null;
+      const op = Math.max(1, station.operationalChargers);
+      const estQueue = station.queueCountSim + (occRate >= 85 ? 1 : 0);
+      return Math.round((estQueue / op) * station.avgChargeSessionMin);
+    }
+
+    function canAchieveWithinDwell(waitMin, chargeMin, dwellMin) {
+      if (!Number.isFinite(waitMin) || !Number.isFinite(chargeMin) || !Number.isFinite(dwellMin)) {
+        return false;
+      }
+      return (waitMin + chargeMin) <= dwellMin;
+    }
+
+    function evaluateStations(stations, input) {
+      const { region, currentSoc, targetSoc, batteryKwh, maxVehicleKw, dwellMin, hourSlot, season } = input;
+      const neededKwh = calcNeededEnergyKwh(currentSoc, targetSoc, batteryKwh);
+      const seasonDelta = getSeasonDelta(season);
+
+      return stations.map(st => {
+        const isAvailable = st.status === "AVAILABLE";
+        const baseOcc = getBaseOccupancyByHour(st.region, hourSlot);
+        const sameRegionBonus = st.region === region ? 0 : 3;
+        const occRate = Math.min(98, baseOcc + seasonDelta);
+        const extraDetourMin = st.extraDetourMin + sameRegionBonus;
+
+        const waitMin = isAvailable ? calcWaitMinutes(st, occRate) : 999;
+        const chargeMin = isAvailable
+          ? calcChargingMinutes(currentSoc, targetSoc, batteryKwh, st.ratedKw, maxVehicleKw)
+          : 999;
+        const totalMin = isAvailable ? extraDetourMin + waitMin + chargeMin : 9999;
+
+        const meetsAvail = isAvailable;
+        const meetsOcc = occRate < 60;
+        const meetsDetour = extraDetourMin <= 5;
+        const meetsDwell = isAvailable && canAchieveWithinDwell(waitMin, chargeMin, dwellMin);
+
+        let penalty = 0;
+        if (!meetsAvail) penalty += 100000;
+        if (!meetsOcc) penalty += 25;
+        if (!meetsDetour) penalty += (extraDetourMin - 5) * 4;
+        if (!meetsDwell) penalty += 40;
+
+        return {
+          ...st,
+          neededKwh,
+          occRate,
+          extraDetourMin,
+          waitMin,
+          chargeMin,
+          totalMin,
+          meetsAvail,
+          meetsOcc,
+          meetsDetour,
+          meetsDwell,
+          score: totalMin + penalty
+        };
+      });
+    }
+
+    function buildRecommendation(stations, input) {
+      const evaluated = evaluateStations(stations, input);
+      const availableList = evaluated.filter(x => x.meetsAvail);
+
+      if (availableList.length === 0) {
+        return {
+          status: "NO_AVAILABLE_STATION",
+          evaluated,
+          recommended: null,
+          isFallback: false,
+          savedMin: 0,
+          alternatives: []
+        };
+      }
+
+      const idealCandidates = availableList
+        .filter(x => x.meetsOcc && x.meetsDetour && x.meetsDwell)
+        .sort((a, b) => a.totalMin - b.totalMin || a.score - b.score);
+
+      const shortestTotalList = [...availableList].sort((a, b) => a.totalMin - b.totalMin);
+      const isFallback = idealCandidates.length === 0;
+      const recommended = isFallback ? shortestTotalList[0] : idealCandidates[0];
+
+      const baseline = evaluated
+        .filter(x => x.meetsAvail && x.region === input.region)
+        .sort((a, b) => b.totalMin - a.totalMin)[0] || shortestTotalList[shortestTotalList.length - 1];
+      const savedMin = Math.max(0, baseline.totalMin - recommended.totalMin);
+
+      const alternatives = shortestTotalList
+        .filter(x => x.id !== recommended.id)
+        .slice(0, 2);
+
+      return {
+        status: "OK",
+        evaluated,
+        recommended,
+        isFallback,
+        savedMin,
+        alternatives
+      };
+    }
+
+    function simulatePeakDistribution(stations, hourSlot = 20, season = "spring_fall") {
+      const regions = ["중앙동", "팔용동", "석동"];
+      const seasonDelta = getSeasonDelta(season);
+
+      const rawRows = regions.map(reg => {
+        const regStations = stations.filter(s => s.region === reg && s.status === "AVAILABLE");
+        const capKw = Math.max(
+          50,
+          regStations.reduce((sum, s) => sum + s.ratedKw * Math.max(1, s.operationalChargers), 0)
+        );
+        const occBefore = Math.min(98, getBaseOccupancyByHour(reg, hourSlot) + seasonDelta);
+        const estKwBefore = Math.round(capKw * (occBefore / 100));
+        return { region: reg, occBefore, estKwBefore, capKw };
+      });
+
+      const sorted = [...rawRows].sort((a, b) => b.occBefore - a.occBefore);
+      const overloaded = sorted[0];
+      const targetRate = 62;
+      const targetKw = Math.round(overloaded.capKw * (targetRate / 100));
+      const shiftedKw = Math.max(0, overloaded.estKwBefore - targetKw);
+      const donors = sorted.slice(1);
+      const perDonorKw = donors.length > 0 ? Math.round(shiftedKw / donors.length) : 0;
+
+      const rows = rawRows.map(r => {
+        if (r.region === overloaded.region) {
+          const occAfter = Math.min(65, Math.round((targetKw / r.capKw) * 100));
+          return {
+            ...r,
+            occAfter,
+            estKwAfter: targetKw,
+            loadRateBefore: Math.round((r.estKwBefore / r.capKw) * 100),
+            loadRateAfter: Math.round((targetKw / r.capKw) * 100)
+          };
+        }
+        const estKwAfter = r.estKwBefore + perDonorKw;
+        const occAfter = Math.min(95, Math.round((estKwAfter / r.capKw) * 100));
+        return {
+          ...r,
+          occAfter,
+          estKwAfter,
+          loadRateBefore: Math.round((r.estKwBefore / r.capKw) * 100),
+          loadRateAfter: Math.round((estKwAfter / r.capKw) * 100)
+        };
+      });
+
+      return {
+        targetPeakRate: 65,
+        rows,
+        summary: `${hourSlot}시(${season}) 기준 고부하 거점 부하(${shiftedKw}kW 가정)를 주변 거점으로 분산했을 때의 시뮬레이션 결과입니다.`
+      };
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function renderRecommendationPanel(recArea, input, result) {
+      if (result.status === "INVALID_INPUT") {
+        recArea.innerHTML = `
+          <div class="error-card">
+            <span class="badge badge-bad">입력 오류</span>
+            <strong>입력값을 확인해 주세요.</strong>
+            <ul style="margin:8px 0 0;padding-left:20px;">
+              ${result.errors.map(err => `<li>${escapeHtml(err)}</li>`).join("")}
+            </ul>
+          </div>
+        `;
+        return;
+      }
+
+      if (result.status === "ALREADY_CHARGED") {
+        recArea.innerHTML = `
+          <div class="rec-card">
+            <span class="badge badge-ok">충전 불필요</span>
+            <strong>현재 SOC(${escapeHtml(input.currentSoc)}%)가 목표 SOC(${escapeHtml(input.targetSoc)}%) 이상입니다.</strong>
+            <p style="margin:6px 0 0;">충전이 필요하지 않은 상태로 판단됩니다.</p>
+          </div>
+        `;
+        return;
+      }
+
+      if (result.status === "NO_AVAILABLE_STATION") {
+        recArea.innerHTML = `
+          <div class="error-card">
+            <span class="badge badge-bad">이용 불가</span>
+            <strong>현재 정상 이용 가능한 충전소가 없습니다.</strong>
+            <p style="margin:6px 0 0;">점검·통신장애 여부를 확인하거나 다른 거점·시간대로 조회해 주세요.</p>
+          </div>
+        `;
+        return;
+      }
+
+      const ideal = result.recommended;
+      const reasons = [];
+      if (!ideal.meetsOcc) reasons.push(`예상 가동률 ${ideal.occRate}%(기준 60% 미만 초과)`);
+      if (!ideal.meetsDetour) reasons.push(`추가 이동 ${ideal.extraDetourMin}분(기준 5분 이내 초과)`);
+      if (!ideal.meetsDwell) {
+        reasons.push(`예상 대기+충전 ${ideal.waitMin + ideal.chargeMin}분 > 체류 ${input.dwellMin}분`);
+      }
+
+      const cardClass = result.isFallback ? "alert-card" : "rec-card";
+      const badgeText = result.isFallback ? "대체 추천 충전소(총 소요 최단)" : "최적 추천 충전소";
+
+      recArea.innerHTML = `
+        <div class="${cardClass}">
+          <div style="margin-bottom:6px;">
+            <span class="badge ${result.isFallback ? "badge-warn" : "badge-ok"}">${escapeHtml(badgeText)}</span>
+            <span class="badge badge-sim">계산/시뮬레이션 결과</span>
+          </div>
+          <div style="font-size:1.15rem;font-weight:700;">${escapeHtml(ideal.name)} (${escapeHtml(ideal.region)})</div>
+          <div style="font-size:0.85rem;color:#374151;margin-top:2px;">
+            목적지/경로: ${escapeHtml(input.destination)} | 충전기: ${escapeHtml(ideal.type)} ${escapeHtml(ideal.ratedKw)}kW |
+            필요 충전량: <strong>${escapeHtml(ideal.neededKwh)} kWh</strong> |
+            체류(${escapeHtml(input.dwellMin)}분) 내 대기+충전 완료: <strong>${ideal.meetsDwell ? "가능" : "어려움"}</strong>
+          </div>
+          ${result.isFallback ? `<p style="margin:8px 0 0;color:#92400e;font-size:0.85rem;">
+            ※ 초기 기준을 모두 만족하는 충전소가 없어 총 소요 시간 기준 대체 충전소를 안내합니다. 미충족 항목: ${escapeHtml(reasons.join(", "))}.
+          </p>` : ""}
+          <div class="metrics">
+            <div class="metric"><div class="k">추가 이동 시간(가정)</div><div class="v">${escapeHtml(ideal.extraDetourMin)}분</div></div>
+            <div class="metric"><div class="k">예상 대기 시간(추정)</div><div class="v">${escapeHtml(ideal.waitMin)}분</div></div>
+            <div class="metric"><div class="k">예상 충전 시간</div><div class="v">${escapeHtml(ideal.chargeMin)}분</div></div>
+            <div class="metric"><div class="k">총 소요 시간</div><div class="v">${escapeHtml(ideal.totalMin)}분</div></div>
+            <div class="metric"><div class="k">비교 대비 절약(가정)</div><div class="v">${escapeHtml(result.savedMin)}분</div></div>
+          </div>
+        </div>
+
+        <div style="font-size:0.9rem;font-weight:700;margin-bottom:8px;">대체 충전소 안내 (총 소요 시간 순)</div>
+        ${result.alternatives.length > 0 ? result.alternatives.map(alt => `
+          <div class="alt-card">
+            <strong>${escapeHtml(alt.name)} (${escapeHtml(alt.region)})</strong> — ${escapeHtml(alt.type)} ${escapeHtml(alt.ratedKw)}kW
+            <div style="font-size:0.83rem;color:#4b5563;margin-top:4px;">
+              총 소요 ${escapeHtml(alt.totalMin)}분 (이동 ${escapeHtml(alt.extraDetourMin)}분 + 대기 ${escapeHtml(alt.waitMin)}분 + 충전 ${escapeHtml(alt.chargeMin)}분) |
+              예상 가동률 ${escapeHtml(alt.occRate)}% | 체류 내 대기+충전 완료: ${alt.meetsDwell ? "가능" : "어려움"}
+            </div>
+          </div>
+        `).join("") : `<p class="note">안내할 추가 대체 충전소가 없습니다.</p>`}
+      `;
+    }
+
+    function renderDistributionPanel(distArea, simData) {
+      if (!simData) {
+        distArea.innerHTML = "";
+        return;
+      }
+      distArea.innerHTML = `
+        <div class="alt-card" style="background:#eef2ff;border-color:#c7d2fe;margin-top:12px;">
+          <span class="badge badge-sim">수요 분산 시뮬레이션</span>
+          <strong>피크 시간대 거점별 가동률 및 추정 전력·부하율 변화(가정)</strong>
+          <p style="margin:6px 0 8px;font-size:0.83rem;color:#3730a3;">${escapeHtml(simData.summary)}</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>거점</th>
+                  <th>분산 전 가동률</th>
+                  <th>분산 후 가동률</th>
+                  <th>분산 전 추정전력</th>
+                  <th>분산 후 추정전력</th>
+                  <th>추정 부하율(전→후)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${simData.rows.map(r => `
+                  <tr>
+                    <td><strong>${escapeHtml(r.region)}</strong></td>
+                    <td>${escapeHtml(r.occBefore)}%</td>
+                    <td><strong>${escapeHtml(r.occAfter)}%</strong></td>
+                    <td>${escapeHtml(r.estKwBefore)} kW</td>
+                    <td>${escapeHtml(r.estKwAfter)} kW</td>
+                    <td>${escapeHtml(r.loadRateBefore)}% → ${escapeHtml(r.loadRateAfter)}%</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTimePatternPanel(container, hourSlot, season) {
+      const seasonDelta = getSeasonDelta(season);
+      const regions = ["팔용동", "중앙동", "석동"];
+
+      container.innerHTML = `
+        <div class="pattern-grid">
+          ${TIME_BANDS.map(band => {
+            const isActive = band.match(hourSlot);
+            const occText = regions
+              .map(reg => `${reg} ${Math.min(98, getBaseOccupancyByHour(reg, hourSlot) + seasonDelta)}%`)
+              .join(" · ");
+            return `
+              <div class="pattern-box ${isActive ? "active" : ""}">
+                <div style="font-weight:700;font-size:0.88rem;">${escapeHtml(band.label)}</div>
+                <div style="font-size:0.8rem;color:#4b5563;margin:4px 0;">${escapeHtml(band.desc)}</div>
+                ${isActive ? `<div style="font-size:0.78rem;color:#1d4ed8;font-weight:600;">현재 선택 시간대 가동률(가정): ${escapeHtml(occText)}</div>` : ""}
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function renderStationTable(tbody, evaluated, filters) {
+      let rows = [...evaluated];
+      if (filters.region !== "ALL") rows = rows.filter(r => r.region === filters.region);
+      if (filters.type !== "ALL") rows = rows.filter(r => r.type === filters.type);
+      if (filters.avail === "AVAILABLE_ONLY") rows = rows.filter(r => r.meetsAvail);
+
+      rows.sort((a, b) => {
+        if (!a.meetsAvail && b.meetsAvail) return 1;
+        if (a.meetsAvail && !b.meetsAvail) return -1;
+        if (filters.sortBy === "occRate") return a.occRate - b.occRate;
+        if (filters.sortBy === "waitTime") return a.waitMin - b.waitMin;
+        return a.totalMin - b.totalMin;
+      });
+
+      tbody.innerHTML = rows.map(r => {
+        const statusBadge = r.status === "AVAILABLE"
+          ? `<span class="badge badge-ok">정상</span>`
+          : r.status === "MAINTENANCE"
+          ? `<span class="badge badge-bad">점검/불가</span>`
+          : `<span class="badge badge-warn">통신확인필요</span>`;
+
+        const srcBadge = String(r.dataSourceType).includes("API")
+          ? `<span class="badge badge-real">${escapeHtml(r.dataSourceType)}</span>`
+          : `<span class="badge badge-sim">${escapeHtml(r.dataSourceType)}</span>`;
+
+        return `
+          <tr>
+            <td><strong>${escapeHtml(r.name)}</strong><br><span style="color:#6b7280;font-size:0.78rem;">${escapeHtml(r.region)}</span> ${srcBadge}</td>
+            <td>${escapeHtml(r.type)} (${escapeHtml(r.ratedKw)}kW)</td>
+            <td>${statusBadge}</td>
+            <td>${escapeHtml(r.occRate)}%</td>
+            <td>${escapeHtml(r.extraDetourMin)}분</td>
+            <td>${r.meetsAvail ? `${escapeHtml(r.waitMin)}분` : "-"}</td>
+            <td>${r.meetsAvail ? `${escapeHtml(r.chargeMin)}분` : "-"}</td>
+            <td><strong>${r.meetsAvail ? `${escapeHtml(r.totalMin)}분` : "제외"}</strong></td>
+            <td>${r.meetsAvail ? (r.meetsDwell ? "가능" : "부족") : "-"}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    const dashboardState = {
+      stations: JSON.parse(JSON.stringify(INITIAL_STATIONS)),
+      distributionSim: null
+    };
+
+    function readUserInput() {
+      return {
+        region: document.getElementById("region").value,
+        destination: document.getElementById("destination").value,
+        currentSoc: Number(document.getElementById("currentSoc").value),
+        targetSoc: Number(document.getElementById("targetSoc").value),
+        batteryKwh: Number(document.getElementById("batteryKwh").value),
+        maxVehicleKw: Number(document.getElementById("maxVehicleKw").value),
+        dwellMin: Number(document.getElementById("dwellMin").value),
+        hourSlot: Number(document.getElementById("hourSlot").value),
+        season: document.getElementById("season").value
+      };
+    }
+
+    function readFilters() {
+      return {
+        region: document.getElementById("filterRegion").value,
+        type: document.getElementById("filterType").value,
+        avail: document.getElementById("filterAvail").value,
+        sortBy: document.getElementById("sortBy").value
+      };
+    }
+
+    function updateDashboard() {
+      const input = readUserInput();
+      const filters = readFilters();
+      const recArea = document.getElementById("recommendationArea");
+      const distArea = document.getElementById("distributionArea");
+      const patternArea = document.getElementById("timePatternArea");
+      const tbody = document.getElementById("stationTableBody");
+      const validation = validateUserInput(input);
+
+      renderTimePatternPanel(patternArea, input.hourSlot, input.season);
+      renderDistributionPanel(distArea, dashboardState.distributionSim);
+
+      if (!validation.valid) {
+        renderRecommendationPanel(recArea, input, {
+          status: "INVALID_INPUT",
+          errors: validation.errors
+        });
+        renderStationTable(tbody, [], filters);
+        return;
+      }
+
+      if (validation.alreadyCharged) {
+        renderRecommendationPanel(recArea, input, { status: "ALREADY_CHARGED" });
+        renderStationTable(tbody, evaluateStations(dashboardState.stations, input), filters);
+        return;
+      }
+
+      const result = buildRecommendation(dashboardState.stations, input);
+      renderRecommendationPanel(recArea, input, result);
+      renderStationTable(tbody, result.evaluated, filters);
+    }
+
+    async function tryLoadApi() {
+      const key = document.getElementById("apiKey").value.trim();
+      const statusEl = document.getElementById("apiStatus");
+      if (!key) {
+        statusEl.innerHTML = `<span class="badge badge-sim">시뮬레이션/샘플</span> ServiceKey가 비어 있어 내장 샘플 데이터를 사용합니다.`;
+        return;
+      }
+      statusEl.innerHTML = `<span class="badge badge-real">API 조회중</span> 한국환경공단 충전소 API 호출 중...`;
+      try {
+        const url = `https://apis.data.go.kr/B552584/EvCharger/getChargerInfo?serviceKey=${encodeURIComponent(key)}&pageNo=1&numOfRows=30&zcode=48&dataType=JSON`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        const mapped = mapApiItemsToStations(data);
+        if (mapped.length === 0) {
+          statusEl.innerHTML = `<span class="badge badge-sim">샘플 유지</span> API 응답은 수신했으나 팔용동·중앙동·석동 일치 항목이 없어 샘플 데이터를 유지합니다.`;
+          return;
+        }
+        dashboardState.stations = mapped;
+        statusEl.innerHTML = `<span class="badge badge-real">API+가정 반영</span> ${escapeHtml(dashboardState.stations.length)}건을 반영했습니다(대기·우회·가동률은 시뮬레이션 가정 병행).`;
+        updateDashboard();
+      } catch (err) {
+        statusEl.innerHTML = `<span class="badge badge-sim">시뮬레이션 유지</span> 직접 브라우저 호출이 제한되었거나 응답에 실패했습니다(${escapeHtml(err.message)}). 내장 샘플 데이터로 계속 동작합니다.`;
+      }
+    }
+
+    function resetSampleStations() {
+      dashboardState.stations = JSON.parse(JSON.stringify(INITIAL_STATIONS));
+      dashboardState.distributionSim = null;
+      document.getElementById("apiStatus").innerHTML =
+        `<span class="badge badge-sim">시뮬레이션/샘플</span> 내장 샘플 데이터(팔용동·중앙동·석동)로 복원했습니다.`;
+      updateDashboard();
+    }
+
+    document.getElementById("runBtn").addEventListener("click", updateDashboard);
+    document.getElementById("simDistBtn").addEventListener("click", () => {
+      const input = readUserInput();
+      dashboardState.distributionSim = simulatePeakDistribution(dashboardState.stations, input.hourSlot, input.season);
+      updateDashboard();
+    });
+    document.getElementById("loadApiBtn").addEventListener("click", tryLoadApi);
+    document.getElementById("resetSampleBtn").addEventListener("click", resetSampleStations);
+    ["filterRegion", "filterType", "filterAvail", "sortBy"].forEach(id => {
+      document.getElementById(id).addEventListener("change", updateDashboard);
+    });
+
+    updateDashboard();
+  </script>
+</body>
+</html>
